@@ -77,7 +77,7 @@ def main():
     # Update values for specified columns
     try:
         # Create a lookup dictionary from the grouped usage_stats
-        lookup = usage_stats_grouped.set_index('join_key')[['TOTAL_ACCESS_COUNT', 'ACCESS_COUNT_LAST_3_MONTHS', 'LAST_ACCESSED', 'LAST_UPDATED']].to_dict('index')
+        lookup = usage_stats_grouped.set_index('join_key')[['TOTAL_ACCESS_COUNT', 'ACCESS_COUNT_LAST_3_MONTHS', 'LAST_ACCESSED', 'LAST_UPDATED', 'LAST_QUERIES']].to_dict('index')
 
         # Update the corresponding columns in the technical data set
         for idx, row in technical_data_set.iterrows():
@@ -87,6 +87,7 @@ def main():
                 technical_data_set.at[idx, 'Access Count Last 3 Months'] = lookup[key]['ACCESS_COUNT_LAST_3_MONTHS']
                 technical_data_set.at[idx, 'Last Query Execution Date'] = lookup[key]['LAST_ACCESSED']
                 technical_data_set.at[idx, 'Data Freshness'] = lookup[key]['LAST_UPDATED']
+                technical_data_set.at[idx, 'Recent Queries'] = lookup[key]['LAST_QUERIES']
 
         print_log("Columns updated successfully", "✅")
     except Exception as e:

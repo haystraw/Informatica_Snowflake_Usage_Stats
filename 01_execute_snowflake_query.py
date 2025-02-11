@@ -22,15 +22,57 @@ def print_log(message, emoji="INFO"):
 
 # Function to read configuration from a file
 def read_config(file_path):
+    """Reads a config file with stanza (INI-like) formatting, preserving multi-line sections."""
     config = {}
-    print_log("Reading configuration from file...", "📄")
-    with open(file_path, 'r') as file:
-        for line in file:
-            if '=' in line:
-                name, value = line.strip().split('=', 1)
-                config[name] = value
-    print_log("Configuration successfully loaded.", "✅")
+    ## print_log("Reading configuration from file...", "📄")
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            current_key = None  # Track the last section (e.g., [query])
+            current_value = []  # Store multi-line values
+
+            for line in file:
+                line = line.rstrip()  # Keep indentation for SQL blocks
+
+                # Skip empty lines and comments (lines starting with # or ;)
+                if not line or line.startswith(("#", ";")):
+                    continue
+
+                # Detect section headers (e.g., [query])
+                if line.startswith("[") and line.endswith("]"):
+                    # Save the previous section's content before moving to the next
+                    if current_key:
+                        config[current_key] = "\n".join(current_value).strip()
+
+                    # Start tracking new section
+                    current_key = line[1:-1].strip()  # Remove brackets
+                    current_value = []
+                    continue
+
+                # Handle key-value pairs (e.g., role=ACCOUNTADMIN)
+                if "=" in line and not current_key:
+                    key, value = line.split("=", 1)
+                    config[key.strip()] = value.strip()
+                    continue
+
+                # If inside a section, append multi-line content
+                if current_key:
+                    current_value.append(line)
+
+            # Store the last section's content
+            if current_key:
+                config[current_key] = "\n".join(current_value).strip()
+
+    except FileNotFoundError:
+        print_log(f"❌ Error: Config file not found: {file_path}", "‼️")
+    except Exception as e:
+        print_log(f"❌ Error reading config file: {str(e)}", "‼️")
+
     return config
+
+
+
+
 
 # Function to generate and save encryption key
 def generate_key():
@@ -122,6 +164,7 @@ def main():
     try:
         # Read configuration
         config = read_config('snowflake.conf.txt')
+        
         user = config['user']
 
         # Get password securely

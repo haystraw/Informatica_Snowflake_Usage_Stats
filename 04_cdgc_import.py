@@ -193,7 +193,7 @@ jobId = perform_cdgc_import(orgId, jwt_token, config['cdgcAPIurl'], enriched_fil
 
 if jobId:
     status = None
-    while status not in ["FAILED", "COMPLETED"]:
+    while status not in ["FAILED", "COMPLETED", "PARTIAL_COMPLETED"]:
         time.sleep(int(config['idmcStatusCheckIntervalInSec']))
         status = get_job_status(orgId, jwt_token, config['cdgcAPIurl'], jobId)
 

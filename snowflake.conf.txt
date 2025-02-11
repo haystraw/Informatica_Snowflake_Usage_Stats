@@ -1,8 +1,161 @@
-account=informatica.eu-central-1
-user=CONTOSO_READ
-warehouse=EMEA_ACME_RETAIL_WH
-database=EMEA_DEMO_ENV
-schema=CONTOSO
-role=CONTOSO_READ
-query=select * from EMEA_DEMO_ENV.CONTOSO.last_access_date_per_object
+account=eeb76041
+user=SHAYES
+warehouse=DEFAULT_DW
+database=NSEN
+schema=NSEN
 output_file=usage_stats_snowflake.csv
+role=ACCOUNTADMIN
+obsolete_query_of_view=SELECT * FROM NSEN.last_access_date_per_object
+[query]
+/* 
+	Change XXX_DATABASE_XXX to your Database Name
+	Change XXX_SCHEMA_XXX to your Schema Name
+	
+	Query that results in the following columns
+	DATABASE_NAME
+	SCHEMA_NAME
+	OBJECT_NAME
+	TOTAL_ACCESS_COUNT
+	ACCESS_COUNT_LAST_3_MONTHS
+	LAST_ACCESSED
+	LAST_UPDATED
+	TOTAL_SCHEMA_ACCESS_COUNT
+	SCHEMA_ACCESS_COUNT_LAST_3_MONTHS
+	LAST_SCHEMA_ACCESSED
+	LAST_SCHEMA_UPDATED
+	LAST_QUERIES
+*/
+WITH object_access AS (
+    SELECT 
+        value:objectName::STRING AS object_name,
+        COUNT(*) AS total_access_count,
+        MAX(query_start_time) AS last_accessed,
+        COUNT(CASE WHEN query_start_time >= DATEADD(MONTH, -3, CURRENT_DATE) THEN 1 END) AS access_count_last_3_months
+    FROM 
+        SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY,
+        LATERAL FLATTEN(input => DIRECT_OBJECTS_ACCESSED) AS objects
+    WHERE 
+        objects.value:objectDomain IN ('Table', 'View')
+        AND value:objectName::STRING LIKE 'XXX_DATABASE_XXX.XXX_SCHEMA_XXX.%'
+    GROUP BY 
+        object_name
+),
+schema_access AS (
+    SELECT 
+        'XXX_SCHEMA_XXX' AS schema_name,
+        COUNT(*) AS total_schema_access_count,
+        COUNT(CASE WHEN query_start_time >= DATEADD(MONTH, -3, CURRENT_DATE) THEN 1 END) AS schema_access_count_last_3_months,
+        MAX(query_start_time) AS last_schema_accessed
+    FROM 
+        SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY,
+        LATERAL FLATTEN(input => DIRECT_OBJECTS_ACCESSED) AS objects
+    WHERE 
+        objects.value:objectDomain IN ('Table', 'View')
+        AND value:objectName::STRING LIKE 'XXX_DATABASE_XXX.XXX_SCHEMA_XXX.%'
+),
+schema_last_updated AS (
+    SELECT 
+        'XXX_SCHEMA_XXX' AS schema_name,
+        MAX(last_altered) AS last_schema_updated
+    FROM 
+        XXX_DATABASE_XXX.INFORMATION_SCHEMA.TABLES
+    WHERE 
+        table_schema = 'XXX_SCHEMA_XXX'
+    UNION ALL
+    SELECT 
+        'XXX_SCHEMA_XXX' AS schema_name,
+        MAX(last_altered) AS last_schema_updated
+    FROM 
+        XXX_DATABASE_XXX.INFORMATION_SCHEMA.VIEWS
+    WHERE 
+        table_schema = 'XXX_SCHEMA_XXX'
+),
+last_queries AS (
+    SELECT 
+        q.query_text,
+        q.start_time,
+        CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS full_object_name,
+        ROW_NUMBER() OVER (PARTITION BY t.table_catalog, t.table_schema, t.table_name ORDER BY q.start_time DESC) AS query_rank
+    FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY q
+    JOIN XXX_DATABASE_XXX.INFORMATION_SCHEMA.TABLES t
+        ON q.query_text ILIKE '%' || t.table_name || '%'
+    WHERE q.start_time >= DATEADD(DAY, -90, CURRENT_TIMESTAMP()) -- Last 90 days
+    AND q.QUERY_TYPE = 'SELECT'
+),
+last_queries_aggregated AS (
+    SELECT 
+        full_object_name,
+        -- LISTAGG separator must be constant, so we replace '; ' with '; <NEWLINE>' later
+        LISTAGG(query_text, ' ; ') WITHIN GROUP (ORDER BY start_time DESC) AS last_three_queries
+    FROM last_queries
+    WHERE query_rank <= 3
+    GROUP BY full_object_name
+)
+SELECT
+    DISTINCT
+    full_data.database_name,
+    full_data.schema_name,
+    full_data.object_name,
+    full_data.total_access_count,
+    full_data.access_count_last_3_months,
+    full_data.last_accessed,
+    full_data.last_updated,
+    full_data.total_schema_access_count,
+    full_data.schema_access_count_last_3_months,
+    full_data.last_schema_accessed,
+    full_data.last_schema_updated,
+    -- Use REPLACE to insert newlines after LISTAGG
+    COALESCE(REPLACE(lq.last_three_queries, '; ', ';' || CHAR(10)), 'No recent queries') AS last_queries
+FROM (
+    SELECT 
+        t.table_catalog AS database_name,
+        t.table_schema AS schema_name,
+        t.table_name AS object_name,
+        CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) AS full_object_name,
+        COALESCE(a.total_access_count, 0) AS total_access_count,
+        COALESCE(a.access_count_last_3_months, 0) AS access_count_last_3_months,
+        CASE 
+            WHEN a.last_accessed IS NULL THEN 'Never Accessed'
+            ELSE TO_CHAR(a.last_accessed, 'YYYY-MM-DD')
+        END AS last_accessed,
+        TO_CHAR(t.last_altered, 'YYYY-MM-DD') AS last_updated,
+        s.total_schema_access_count,
+        s.schema_access_count_last_3_months,
+        TO_CHAR(s.last_schema_accessed, 'YYYY-MM-DD') AS last_schema_accessed,
+        TO_CHAR(u.last_schema_updated, 'YYYY-MM-DD') AS last_schema_updated
+    FROM XXX_DATABASE_XXX.INFORMATION_SCHEMA.TABLES t
+    LEFT JOIN object_access a 
+        ON CONCAT(t.table_catalog, '.', t.table_schema, '.', t.table_name) = a.object_name
+    CROSS JOIN schema_access s
+    CROSS JOIN schema_last_updated u
+    WHERE t.table_schema = 'XXX_SCHEMA_XXX'
+    UNION ALL
+    SELECT 
+        v.table_catalog AS database_name,
+        v.table_schema AS schema_name,
+        v.table_name AS object_name,
+        CONCAT(v.table_catalog, '.', v.table_schema, '.', v.table_name) AS full_object_name,
+        COALESCE(a.total_access_count, 0) AS total_access_count,
+        COALESCE(a.access_count_last_3_months, 0) AS access_count_last_3_months,
+        CASE 
+            WHEN a.last_accessed IS NULL THEN 'Never Accessed'
+            ELSE TO_CHAR(a.last_accessed, 'YYYY-MM-DD')
+        END AS last_accessed,
+        TO_CHAR(v.last_altered, 'YYYY-MM-DD') AS last_updated,
+        s.total_schema_access_count,
+        s.schema_access_count_last_3_months,
+        TO_CHAR(s.last_schema_accessed, 'YYYY-MM-DD') AS last_schema_accessed,
+        TO_CHAR(u.last_schema_updated, 'YYYY-MM-DD') AS last_schema_updated
+    FROM XXX_DATABASE_XXX.INFORMATION_SCHEMA.VIEWS v
+    LEFT JOIN object_access a 
+        ON CONCAT(v.table_catalog, '.', v.table_schema, '.', v.table_name) = a.object_name
+    CROSS JOIN schema_access s
+    CROSS JOIN schema_last_updated u
+    WHERE v.table_schema = 'XXX_SCHEMA_XXX'
+) full_data
+LEFT JOIN last_queries_aggregated lq
+    ON full_data.full_object_name = lq.full_object_name
+ORDER BY last_accessed DESC
+
+
+

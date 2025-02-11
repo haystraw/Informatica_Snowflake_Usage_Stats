@@ -133,7 +133,8 @@ def get_jwt_token(sessionId, idmcURL):
 
 def search_export_assets(orgId, jwt_token, cdgcAPIurl, IdmcknowledgeQuery, idmcExportFileName):
     print_log("Initiating export job...", "📦")
-    url = f'https://{cdgcAPIurl}/data360/search/export/v1/assets?knowledgeQuery={IdmcknowledgeQuery}&segments=summary,customAttributes&fileName={idmcExportFileName}&summaryViews=all'
+    ## url = f'https://{cdgcAPIurl}/data360/search/export/v1/assets?knowledgeQuery={IdmcknowledgeQuery}&segments=summary,customAttributes&fileName={idmcExportFileName}&summaryViews=all'
+    url = f'https://{cdgcAPIurl}/data360/search/export/v1/assets?knowledgeQuery={IdmcknowledgeQuery}&segments=all&fileName={idmcExportFileName}'
     headers = {
         'X-INFA-ORG-ID': orgId,
         'Content-Type': 'application/json',
