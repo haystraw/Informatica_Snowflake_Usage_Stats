@@ -1,0 +1,8 @@
+account=informatica.eu-central-1
+user=CONTOSO_READ
+warehouse=EMEA_ACME_RETAIL_WH
+database=EMEA_DEMO_ENV
+schema=CONTOSO
+role=CONTOSO_READ
+query=select * from EMEA_DEMO_ENV.CONTOSO.last_access_date_per_object
+output_file=usage_stats_snowflake.csv

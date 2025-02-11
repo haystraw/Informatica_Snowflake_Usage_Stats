@@ -1,0 +1,6 @@
+IdmcUserName=tspod_sandbox_fouad
+idmcURL=dmp-us.informaticacloud.com
+cdgcAPIurl=idmc-api.dmp-us.informaticacloud.com
+IdmcknowledgeQuery=(tables,views) in catalog source snowflake_retail_dwh
+idmcExportFileName=cdgc_snowflake_table_export
+idmcStatusCheckIntervalInSec=30

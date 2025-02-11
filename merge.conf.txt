@@ -1,0 +1,2 @@
+cdgc_file=cdgc_snowflake_table_export.xlsx
+usage_file=usage_stats_snowflake.csv
