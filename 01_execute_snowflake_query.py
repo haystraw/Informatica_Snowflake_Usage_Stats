@@ -68,6 +68,16 @@ def read_config(file_path):
     except Exception as e:
         print_log(f"❌ Error reading config file: {str(e)}", "‼️")
 
+    try:
+        ## Replace tokens in query
+        this_database = config['database']
+        this_schema = config['schema']
+        current_query = config['query']
+        new_query = current_query.replace('XXX_DATABASE_XXX', this_database).replace('XXX_SCHEMA_XXX', this_schema)
+        config['query'] = new_query
+    except:
+        pass
+
     return config
 
 
