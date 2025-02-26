@@ -54,21 +54,23 @@ schema_access AS (
         AND value:objectName::STRING LIKE 'XXX_DATABASE_XXX.XXX_SCHEMA_XXX.%'
 ),
 schema_last_updated AS (
-    SELECT 
+select max(last_schema_updated) AS last_schema_updated from (
+    SELECT
         'XXX_SCHEMA_XXX' AS schema_name,
         MAX(last_altered) AS last_schema_updated
-    FROM 
+    FROM
         XXX_DATABASE_XXX.INFORMATION_SCHEMA.TABLES
-    WHERE 
+    WHERE
         table_schema = 'XXX_SCHEMA_XXX'
     UNION ALL
-    SELECT 
+    SELECT
         'XXX_SCHEMA_XXX' AS schema_name,
         MAX(last_altered) AS last_schema_updated
-    FROM 
+    FROM
         XXX_DATABASE_XXX.INFORMATION_SCHEMA.VIEWS
-    WHERE 
+    WHERE
         table_schema = 'XXX_SCHEMA_XXX'
+	)
 ),
 last_queries AS (
     SELECT 

@@ -64,8 +64,15 @@ def main():
     # Prepare join keys
     try:
         usage_stats['join_key'] = usage_stats['DATABASE_NAME'] + '/' + usage_stats['SCHEMA_NAME'] + '/' + usage_stats['OBJECT_NAME']
-        technical_data_set['join_key'] = technical_data_set['HierarchicalPath'].str.split(pat='/', n=1).str[1]
+        if (technical_data_set['HierarchicalPath'].str.len() > 2).all():
+            technical_data_set['join_key'] = technical_data_set['HierarchicalPath'].str.split(pat='/', n=1).str[1]
+        else:
+            ## Oh no. The HierarchicalPath for some or all of these are blank!
+            ## Using the Reference ID instead
+            technical_data_set['join_key'] = technical_data_set['Reference ID'].str.extract(r'//(.*?)~')   
 
+        ## print(f"DEBUGSCOTT: Setting join key on usage_stats: {usage_stats['join_key']}")
+       
         # Ensure unique keys in usage_stats by grouping (e.g., taking the first occurrence)
         usage_stats_grouped = usage_stats.groupby('join_key').first().reset_index()
 
